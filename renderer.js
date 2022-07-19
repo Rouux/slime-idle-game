@@ -3,6 +3,20 @@ window.entities = [];
 const canvas = document.getElementById('main-canvas');
 const context = canvas.getContext('2d');
 
+class Vector2 {
+	constructor(x = 0, y = 0) {
+		this.x = x;
+		this.y = y;
+	}
+
+	static ZERO = new Vector2(0, 0);
+	static ONE = new Vector2(1, 1);
+	static UP = new Vector2(0, 1);
+	static RIGHT = new Vector2(1, 0);
+	static DOWN = new Vector2(0, -1);
+	static LEFT = new Vector2(-1, 0);
+}
+
 class Bounds {
 	constructor({ x = 0, y = 0, width = 0, height = 0 }) {
 		this.x = x;
@@ -14,6 +28,11 @@ class Bounds {
 
 class Component {
 	constructor() {}
+
+	get position() {
+		return this.entity.transform.position;
+	}
+
 	onInit() {}
 	beforeDraw(_context) {}
 	onDraw(_context) {}
@@ -21,13 +40,21 @@ class Component {
 	onDestroy() {}
 }
 
+class Transform {
+	constructor(position = Vector2.ZERO) {
+		this.position = position;
+	}
+}
+
 class Entity {
-	constructor() {
+	constructor(x = 0, y = 0) {
+		this.transform = new Transform(new Vector2(x, y));
 		this.components = [];
 		entities.push(this);
 	}
 
 	addComponent(component) {
+		component.entity = this;
 		this.components.push(component);
 		return this;
 	}
@@ -39,22 +66,9 @@ class Entity {
 	}
 }
 
-const Assets = {
-	'character:slime:lime': {
-		source: 'sprites/slime_16_16_2.png',
-		unitWidth: 64,
-		unitHeight: 44
-	},
-	'block:prototype:64': {
-		source: 'sprites/tile_64.png',
-		unitWidth: 64,
-		unitHeight: 64
-	}
-};
-
 class Texture {
-	constructor(name) {
-		this.asset = Assets[name];
+	constructor(asset) {
+		this.asset = asset;
 		this.image = new Image();
 		this.image.addEventListener('load', () => (this.loaded = true), false);
 		this.image.src = `./assets/${this.asset.source}`;
@@ -91,11 +105,14 @@ class Texture {
 }
 
 class SpriteComponent extends Component {
-	constructor(name, options = { source: {}, destination: {} }) {
+	constructor(assetName) {
 		super();
-		this.source = new Bounds(options.source);
-		this.destination = new Bounds(options.destination);
-		this.texture = new Texture(name);
+		this.asset = Assets[assetName];
+		this.source = new Bounds({});
+	}
+
+	onInit() {
+		this.texture = new Texture(this.asset);
 	}
 
 	get width() {
@@ -111,22 +128,23 @@ class SpriteComponent extends Component {
 			context,
 			this.source.x,
 			this.source.y,
-			this.source.width || this.texture.asset.unitWidth,
-			this.source.height || this.texture.asset.unitHeight,
-			this.destination.x,
-			this.destination.y,
-			this.destination.width || this.texture.asset.unitWidth,
-			this.destination.height || this.texture.asset.unitHeight
+			this.width,
+			this.height,
+			this.position.x,
+			this.position.y,
+			this.width,
+			this.height
 		);
 	}
 }
 
-class SpriteAnimationComponent extends SpriteComponent {
-	constructor(src, options = { source: {}, destination: {}, animationFrames }) {
-		super(src, options);
+class AnimatedSpriteComponent extends SpriteComponent {
+	constructor(assetName) {
+		super(assetName);
+		this.asset = AnimatedAssets[assetName];
 		this.frame = parseInt(Math.random() * 10);
 		this.animationFrame = 0;
-		this.maxAnimationFrames = options.animationFrames || 1;
+		this.maxAnimationFrames = this.asset.frames || 1;
 	}
 
 	onDraw(context) {
@@ -144,46 +162,28 @@ class SpriteAnimationComponent extends SpriteComponent {
 	}
 }
 
-new Entity().addComponent(
-	new SpriteAnimationComponent('character:slime:lime', {
-		source: {
-			x: 0,
-			y: 0
-		},
-		destination: {
-			x: 64,
-			y: 64
-		},
-		animationFrames: 2
-	})
-);
-
-new Entity().addComponent(
-	new SpriteComponent('block:prototype:64', {
-		source: {
-			x: 0,
-			y: 0
-		},
-		destination: {
-			x: 64,
-			y: 0
-		}
-	})
-);
-
 (function () {
-	callComponentMethod = (name, ...args) => {
+	const callComponentMethod = (name, ...args) => {
 		return entity =>
 			entity.components.forEach(component => component[name](...args));
 	};
 
-	start = () => {
+	const start = () => {
+		for (let col = 0; col < 10; col++) {
+			new Entity(col * 64, 0).addComponent(
+				new SpriteComponent('block:prototype:64')
+			);
+		}
+		new Entity(64, 64).addComponent(
+			new AnimatedSpriteComponent('character:slime:lime')
+		);
+
 		entities.forEach(callComponentMethod('onInit'));
 		loop();
 	};
 
-	loop = () => {
-		context.fillStyle = '#FF0000';
+	const loop = () => {
+		context.fillStyle = 'lightblue';
 		context.fillRect(0, 0, canvas.width, canvas.height);
 
 		entities.forEach(callComponentMethod('beforeDraw', context));
