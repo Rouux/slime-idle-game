@@ -9,6 +9,33 @@ class Vector2 {
 		this.y = y;
 	}
 
+	get magnitude() {
+		return Math.sqrt(this.x * this.x + this.y * this.y);
+	}
+
+	sub(other) {
+		return new Vector2(this.x - other.x, this.y - other.y);
+	}
+
+	divide(number) {
+		return new Vector2(this.x / number, this.y / number);
+	}
+
+	distance(other) {
+		return Math.sqrt(
+			(this.x - other.x) * (this.x - other.x) +
+				(this.y - other.y) * (this.y - other.y)
+		);
+	}
+
+	normalize() {
+		const magnitude = this.magnitude;
+		if (magnitude !== 0) {
+			return this.divide(magnitude);
+		}
+		return this;
+	}
+
 	static ZERO = new Vector2(0, 0);
 	static ONE = new Vector2(1, 1);
 	static UP = new Vector2(0, 1);
@@ -34,6 +61,7 @@ class Component {
 	}
 
 	onInit() {}
+	update(_delta) {}
 	beforeDraw(_context) {}
 	onDraw(_context) {}
 	afterDraw(_context) {}
@@ -145,20 +173,71 @@ class AnimatedSpriteComponent extends SpriteComponent {
 		this.frame = parseInt(Math.random() * 10);
 		this.animationFrame = 0;
 		this.maxAnimationFrames = this.asset.frames || 1;
+		this.frameLength = this.asset.frameLength || 1;
 	}
 
 	onDraw(context) {
 		this.source.x = this.animationFrame * this.width;
 		super.onDraw(context);
-		this._nextFrame();
+		this.nextFrame();
 	}
 
-	_nextFrame() {
-		if (this.frame > 30) {
+	nextFrame() {
+		if (this.frame > this.frameLength) {
 			this.animationFrame = (this.animationFrame + 1) % this.maxAnimationFrames;
 			this.frame = 0;
 		}
 		this.frame++;
+	}
+}
+
+class SlimeControllerComponent extends Component {
+	constructor(speed = 80) {
+		super();
+		this.speed = speed;
+		this.target = undefined;
+		this.lastTargetReachedTime = 0;
+	}
+
+	onInit() {
+		this.animatedSprite = this.entity.getComponent('AnimatedSpriteComponent');
+	}
+
+	update(time, delta) {
+		if (this.target) {
+			const reached = this.moveToTarget(delta);
+			if (reached) {
+				this.target = undefined;
+				this.lastTargetReachedTime = time;
+			}
+		} else if (this.canFindTarget(time)) {
+			this.target = new Vector2(
+				Math.random() * (canvas.width - this.animatedSprite.width),
+				this.position.y
+			);
+		}
+	}
+
+	moveToTarget(delta) {
+		this.target.sub(this.position);
+		const direction = diff.normalize();
+		const directionalDistance = delta * this.speed * direction.x;
+		const distanceToTarget = this.position.distance(this.target);
+		this.position.x += MathExt.clamp(
+			directionalDistance,
+			-distanceToTarget,
+			distanceToTarget
+		);
+
+		return Math.abs(directionalDistance) >= Math.abs(distanceToTarget);
+	}
+
+	canFindTarget(time) {
+		return time - this.lastTargetReachedTime > this.restTime();
+	}
+
+	restTime() {
+		return Math.random() * 2500 + 1000;
 	}
 }
 
@@ -174,22 +253,27 @@ class AnimatedSpriteComponent extends SpriteComponent {
 				new SpriteComponent('block:prototype:64')
 			);
 		}
-		new Entity(64, 64).addComponent(
-			new AnimatedSpriteComponent('character:slime:lime')
-		);
+		new Entity(64, 64)
+			.addComponent(new SlimeControllerComponent())
+			.addComponent(new AnimatedSpriteComponent('character:slime:lime'));
 
 		entities.forEach(callComponentMethod('onInit'));
 		loop();
 	};
 
-	const loop = () => {
+	let lastUpdate = 0;
+
+	const loop = (timeSinceStart = 0) => {
+		const delta = (timeSinceStart - lastUpdate) / 1e3;
 		context.fillStyle = 'lightblue';
 		context.fillRect(0, 0, canvas.width, canvas.height);
 
+		entities.forEach(callComponentMethod('update', timeSinceStart, delta));
 		entities.forEach(callComponentMethod('beforeDraw', context));
 		entities.forEach(callComponentMethod('onDraw', context));
 		entities.forEach(callComponentMethod('afterDraw', context));
 
+		lastUpdate = timeSinceStart;
 		window.requestAnimationFrame(loop);
 	};
 

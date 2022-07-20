@@ -15,8 +15,13 @@ const AnimatedAssets = {
 		source: 'sprites/slime_16_16_2.png',
 		unitWidth: 64,
 		unitHeight: 44,
-		frames: 2
+		frames: 2,
+		frameLength: 24
 	}
 };
 
 contextBridge.exposeInMainWorld('AnimatedAssets', AnimatedAssets);
+
+contextBridge.exposeInMainWorld('MathExt', {
+	clamp: (num, min, max) => Math.min(Math.max(num, min), max)
+});
