@@ -219,7 +219,7 @@ class SlimeControllerComponent extends Component {
 	}
 
 	moveToTarget(delta) {
-		this.target.sub(this.position);
+		const diff = this.target.sub(this.position);
 		const direction = diff.normalize();
 		const directionalDistance = delta * this.speed * direction.x;
 		const distanceToTarget = this.position.distance(this.target);
