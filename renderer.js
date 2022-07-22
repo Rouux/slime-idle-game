@@ -13,6 +13,10 @@ class Vector2 {
 		return Math.sqrt(this.x * this.x + this.y * this.y);
 	}
 
+	add(other) {
+		return new Vector2(this.x + other.x, this.y + other.y);
+	}
+
 	sub(other) {
 		return new Vector2(this.x - other.x, this.y - other.y);
 	}
@@ -54,23 +58,38 @@ class Bounds {
 }
 
 class Component {
-	constructor() {}
-
-	get position() {
-		return this.entity.transform.position;
+	constructor(position) {
+		this.transform = new Transform(position);
 	}
 
-	onInit() {}
+	get position() {
+		return this.transform.position;
+	}
+
+	onInit() {
+		this.transform.parent = this.entity.transform;
+	}
+
 	update(_delta) {}
-	beforeDraw(_context, delta) {}
-	onDraw(_context, delta) {}
-	afterDraw(_context, delta) {}
+	beforeDraw(_context, _delta) {}
+	onDraw(_context, _delta) {}
+	afterDraw(_context, _delta) {}
 	onDestroy() {}
 }
 
 class Transform {
 	constructor(position = Vector2.ZERO) {
-		this.position = position;
+		this._position = position;
+		this.parent = undefined;
+	}
+
+	get position() {
+		if (!this.parent) return this._position;
+		return this._position.add(this.parent.position);
+	}
+
+	set position(position) {
+		this._position = position;
 	}
 }
 
@@ -79,6 +98,10 @@ class Entity {
 		this.transform = new Transform(new Vector2(x, y));
 		this.components = [];
 		entities.push(this);
+	}
+
+	get position() {
+		return this.transform.position;
 	}
 
 	addComponent(component) {
@@ -140,6 +163,7 @@ class SpriteComponent extends Component {
 	}
 
 	onInit() {
+		super.onInit();
 		this.texture = new Texture(this.asset);
 	}
 
@@ -252,6 +276,28 @@ class AnimatedSpriteComponent extends SpriteComponent {
 	}
 }
 
+class HitboxComponent extends Component {
+	constructor(position, size) {
+		super();
+		this.transform = new Transform(position);
+		this.size = size;
+	}
+
+	onDraw(context) {
+		context.beginPath();
+		context.strokeStyle = 'yellow';
+		context.rect(
+			this.position.x,
+			canvas.height - this.size.height - this.position.y,
+			this.size.width,
+			this.size.height
+		);
+		context.lineWidth = 3;
+		context.stroke();
+		context.closePath();
+	}
+}
+
 class SlimeControllerComponent extends Component {
 	constructor(speed = 100) {
 		super();
@@ -276,17 +322,17 @@ class SlimeControllerComponent extends Component {
 			this.animatedSprite.playAnimationLoop('WALKING');
 			this.target = new Vector2(
 				parseInt(Math.random() * (canvas.width - this.animatedSprite.width)),
-				this.position.y
+				this.entity.position.y
 			);
 		}
 		this.animatedSprite.animationSpeed = this.speed / 100.0;
 	}
 
 	moveToTarget(delta) {
-		const direction = this.target.sub(this.position).normalize();
+		const direction = this.target.sub(this.entity.position).normalize();
 		const directionalDistance = delta * this.speed * direction.x;
-		const distanceToTarget = this.position.distance(this.target);
-		this.position.x += MathExt.clamp(
+		const distanceToTarget = this.entity.position.distance(this.target);
+		this.entity.position.x += MathExt.clamp(
 			directionalDistance,
 			-distanceToTarget,
 			distanceToTarget
@@ -321,7 +367,10 @@ class SlimeControllerComponent extends Component {
 		}
 		new Entity(64, 64)
 			.addComponent(new SlimeControllerComponent())
-			.addComponent(new AnimatedSpriteComponent('character:slime'));
+			.addComponent(new AnimatedSpriteComponent('character:slime'))
+			.addComponent(
+				new HitboxComponent(new Vector2(0, 0), { width: 64, height: 64 })
+			);
 
 		entities.forEach(callComponentMethod('onInit'));
 		loop();

@@ -71,7 +71,7 @@ const AnimatedAssets = {
 					trimmed: false,
 					spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
 					sourceSize: { w: 64, h: 64 },
-					duration: 96
+					duration: 140
 				},
 				{
 					filename: 'simple_slime_64 6.aseprite',
@@ -80,7 +80,7 @@ const AnimatedAssets = {
 					trimmed: false,
 					spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
 					sourceSize: { w: 64, h: 64 },
-					duration: 128
+					duration: 160
 				},
 				{
 					filename: 'simple_slime_64 7.aseprite',
@@ -89,7 +89,7 @@ const AnimatedAssets = {
 					trimmed: false,
 					spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
 					sourceSize: { w: 64, h: 64 },
-					duration: 128
+					duration: 160
 				},
 				{
 					filename: 'simple_slime_64 8.aseprite',
@@ -98,7 +98,7 @@ const AnimatedAssets = {
 					trimmed: false,
 					spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
 					sourceSize: { w: 64, h: 64 },
-					duration: 160
+					duration: 80
 				}
 			]
 		}
