@@ -60,6 +60,7 @@ class Bounds {
 class Component {
 	constructor(position) {
 		this.transform = new Transform(position);
+		this._hasInit = false;
 	}
 
 	get position() {
@@ -68,9 +69,13 @@ class Component {
 
 	onInit() {
 		this.transform.parent = this.entity.transform;
+		this._hasInit = true;
 	}
 
-	update(_delta) {}
+	afterInit() {}
+	update(_delta) {
+		if (!this._hasInit) this.onInit();
+	}
 	beforeDraw(_context, _delta) {}
 	onDraw(_context, _delta) {}
 	afterDraw(_context, _delta) {}
@@ -114,6 +119,12 @@ class Entity {
 		return this.components.find(
 			component => component.constructor.name === name
 		);
+	}
+
+	destroy() {
+		this.components.forEach(component => component.onDestroy());
+		const index = entities.findIndex(entity => entity === this);
+		entities.splice(index, 1);
 	}
 }
 
@@ -191,8 +202,8 @@ class SpriteComponent extends Component {
 }
 
 class SpriteAnimation {
-	constructor(frames, name) {
-		this.frames = frames;
+	constructor(name, animation) {
+		this.frames = animation.frames;
 		this.name = name;
 		this.loop = false;
 		this.frameNumber = 0;
@@ -234,13 +245,19 @@ class AnimatedSpriteComponent extends SpriteComponent {
 		super(assetName);
 		this.asset = AnimatedAssets[assetName];
 		this.defaultAnimation = new SpriteAnimation(
-			this.asset.frames['IDLE'],
-			'IDLE'
+			'IDLE',
+			this.asset.animations['IDLE']
 		);
-		this.animations = Object.keys(this.asset.frames).map(
-			key => new SpriteAnimation(this.asset.frames[key], key)
+		this.animations = Object.keys(this.asset.animations).map(
+			key => new SpriteAnimation(key, this.asset.animations[key])
 		);
 		this.animation = this.defaultAnimation;
+		this.keys = this.asset.keys;
+		this.watched = {};
+	}
+
+	watch(key, callback) {
+		this.watched[key] = callback;
 	}
 
 	_playAnimation(name, loop = false) {
@@ -262,7 +279,22 @@ class AnimatedSpriteComponent extends SpriteComponent {
 	}
 
 	onDraw(context, delta) {
-		this.frame = this.animation.progress(delta);
+		const currentFrameNumber = this.animation.frameNumber;
+		const newFrame = this.animation.progress(delta);
+		if (newFrame != this.frame) {
+			const endKey = this.keys
+				.filter(key => key.animation === this.animation.name)
+				.filter(key => key.time === 'end')
+				.find(key => key.frame === currentFrameNumber)?.name;
+			if (endKey && this.watched[endKey]) this.watched[endKey]();
+
+			const startKey = this.keys
+				.filter(key => key.animation === this.animation.name)
+				.filter(key => key.time === 'start')
+				.find(key => key.frame === this.animation.frameNumber)?.name;
+			if (startKey && this.watched[startKey]) this.watched[startKey]();
+		}
+		this.frame = newFrame;
 		if (!this.frame) {
 			this.animation = this.defaultAnimation;
 			this.frame = this.animation.reset();
@@ -277,15 +309,25 @@ class AnimatedSpriteComponent extends SpriteComponent {
 }
 
 class HitboxComponent extends Component {
-	constructor(position, size) {
+	constructor(position, size, style) {
 		super();
 		this.transform = new Transform(position);
 		this.size = size;
+		this.style = style || { color: 'yellow' };
+	}
+
+	collideWith(other) {
+		return (
+			this.position.x < other.position.x + other.size.width &&
+			this.position.x + this.size.width > other.position.x &&
+			this.position.y < other.position.y + other.size.height &&
+			this.size.height + this.position.y > other.position.y
+		);
 	}
 
 	onDraw(context) {
 		context.beginPath();
-		context.strokeStyle = 'yellow';
+		context.strokeStyle = this.style.color;
 		context.rect(
 			this.position.x,
 			canvas.height - this.size.height - this.position.y,
@@ -298,6 +340,157 @@ class HitboxComponent extends Component {
 	}
 }
 
+class HurtBoxComponent extends HitboxComponent {
+	constructor(self, position, size, damage) {
+		super(position, size, { color: 'red' });
+		this.self = self;
+		this.damage = damage;
+		this.ignoreSelf = true;
+		this.harmedEntities = [];
+	}
+
+	update(delta) {
+		super.update(delta);
+		const hitboxes = entities
+			.filter(
+				entity =>
+					!this.harmedEntities.find(harmedEntity => harmedEntity === entity)
+			)
+			.filter(entity => (this.ignoreSelf ? entity !== this.self : true))
+			.map(entity => entity.getComponent('HitboxComponent'))
+			.filter(component => component !== undefined);
+
+		hitboxes
+			.filter(hitbox => hitbox.collideWith(this))
+			.map(hitbox => hitbox.entity.getComponent('HealthComponent'))
+			.filter(component => component !== undefined)
+			.forEach(healthComponent => {
+				healthComponent.decreaseHealth(this.damage);
+				this.harmedEntities.push(healthComponent.entity);
+			});
+	}
+}
+
+class HealthComponent extends Component {
+	constructor(baseHealth, maxHealth) {
+		super();
+		this.baseHealth = baseHealth;
+		this.health = baseHealth;
+		this.maxHealth = maxHealth ?? baseHealth;
+	}
+
+	get percentage() {
+		return this.health / this.maxHealth;
+	}
+
+	decreaseHealth(amount) {
+		this.health = Math.max(this.health - amount, 0);
+		if (this.health <= 0) this.die();
+	}
+
+	die() {
+		this.entity.destroy();
+	}
+
+	increaseHealth(amount) {
+		this.health = Math.min(this.health + amount, this.maxHealth);
+	}
+}
+
+class FloatingHealthComponent extends Component {
+	onInit() {
+		super.onInit();
+		this.healthComponent = this.entity.getComponent('HealthComponent');
+	}
+
+	onDraw(context) {
+		super.onDraw(context);
+		context.beginPath();
+		context.strokeStyle = 'red';
+		context.lineWidth = 1;
+		context.rect(
+			this.position.x,
+			canvas.height - 12 - this.position.y - 64,
+			64,
+			12
+		);
+		context.closePath();
+		context.stroke();
+
+		context.beginPath();
+		context.fillStyle = 'red';
+		const width = 64 * this.healthComponent.percentage;
+		context.rect(
+			this.position.x,
+			canvas.height - 12 - this.position.y - 64,
+			width,
+			12
+		);
+		context.closePath();
+		context.fill();
+	}
+}
+
+class AttackComponent extends Component {
+	constructor(attackName, damage, cooldown, bounds) {
+		super();
+		this.attackName = attackName;
+		this.damage = damage;
+		this.cooldown = cooldown;
+		this.lastAttack = 0;
+		this.bounds = new Bounds(bounds);
+	}
+
+	onInit() {
+		super.onInit();
+		this.animatedSprite = this.entity.getComponent('AnimatedSpriteComponent');
+		this.duration = this.animatedSprite.animations
+			.find(animation => animation.name === this.attackName)
+			.frames.reduce((prev, animation) => animation.duration + prev, 0);
+		if (this.cooldown === undefined) {
+			this.cooldown = this.duration;
+		}
+	}
+
+	startHurtOn(key) {
+		this.animatedSprite.watch(key, () => {
+			this.hurtBox = new Entity(this.position.x, this.position.y).addComponent(
+				new HurtBoxComponent(
+					this.entity,
+					new Vector2(this.bounds.x, this.bounds.y),
+					{
+						width: this.bounds.width,
+						height: this.bounds.height
+					},
+					this.damage
+				)
+			);
+		});
+	}
+
+	endHurtOn(key) {
+		this.animatedSprite.watch(key, () => {
+			this.hurtBox?.destroy();
+			this.hurtBox = undefined;
+		});
+	}
+
+	isAnimationOver() {
+		return performance.now() - this.lastAttack >= this.duration;
+	}
+
+	canAttack() {
+		return performance.now() - this.lastAttack >= this.cooldown;
+	}
+
+	attack(force = false) {
+		if (force || this.canAttack()) {
+			this.animatedSprite.playAnimationOnce(this.attackName);
+			this.lastAttack = performance.now();
+		}
+	}
+}
+
 class SlimeControllerComponent extends Component {
 	constructor(speed = 100) {
 		super();
@@ -307,16 +500,23 @@ class SlimeControllerComponent extends Component {
 	}
 
 	onInit() {
+		super.onInit();
 		this.animatedSprite = this.entity.getComponent('AnimatedSpriteComponent');
+		this.biteAttack = this.entity.getComponent('AttackComponent');
+	}
+
+	afterInit() {
+		this.biteAttack.startHurtOn('startBite');
+		this.biteAttack.endHurtOn('endBite');
 	}
 
 	update(time, delta) {
 		if (this.target) {
 			const reached = this.moveToTarget(delta);
-			if (reached) {
+			if (reached && this.biteAttack.canAttack()) {
 				this.target = undefined;
 				this.lastTargetReachedTime = time;
-				this.animatedSprite.playAnimationOnce('ATTACKING');
+				this.biteAttack.attack();
 			}
 		} else if (this.canFindTarget(time)) {
 			this.animatedSprite.playAnimationLoop('WALKING');
@@ -341,15 +541,8 @@ class SlimeControllerComponent extends Component {
 		return Math.abs(directionalDistance) >= Math.abs(distanceToTarget);
 	}
 
-	canFindTarget(time) {
-		return (
-			this.animatedSprite.animation.name === 'IDLE' &&
-			time - this.lastTargetReachedTime > this.restTime()
-		);
-	}
-
-	restTime() {
-		return Math.random() * 2500 + 1000;
+	canFindTarget() {
+		return this.biteAttack.isAnimationOver();
 	}
 }
 
@@ -369,10 +562,28 @@ class SlimeControllerComponent extends Component {
 			.addComponent(new SlimeControllerComponent())
 			.addComponent(new AnimatedSpriteComponent('character:slime'))
 			.addComponent(
+				new AttackComponent('ATTACKING', 40, 1000, {
+					x: 32,
+					y: 16,
+					width: 48,
+					height: 48
+				})
+			)
+			.addComponent(
 				new HitboxComponent(new Vector2(0, 0), { width: 64, height: 64 })
-			);
+			)
+			.addComponent(new HealthComponent(100));
+
+		new Entity(256, 64)
+			.addComponent(new AnimatedSpriteComponent('character:slime'))
+			.addComponent(
+				new HitboxComponent(new Vector2(0, 0), { width: 64, height: 64 })
+			)
+			.addComponent(new HealthComponent(100))
+			.addComponent(new FloatingHealthComponent(new Vector2(0, 0)));
 
 		entities.forEach(callComponentMethod('onInit'));
+		entities.forEach(callComponentMethod('afterInit'));
 		loop();
 	};
 
