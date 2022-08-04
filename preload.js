@@ -16,13 +16,13 @@ const AnimatedAssets = {
 		keys: [
 			{
 				name: 'startBite',
-				animation: 'ATTACKING',
+				animation: 'ATTACK_BITE',
 				frame: 2,
 				time: 'start'
 			},
 			{
 				name: 'endBite',
-				animation: 'ATTACKING',
+				animation: 'ATTACK_BITE',
 				frame: 2,
 				time: 'end'
 			}
@@ -72,7 +72,7 @@ const AnimatedAssets = {
 					}
 				]
 			},
-			ATTACKING: {
+			ATTACK_BITE: {
 				frames: [
 					{
 						filename: 'simple_slime_64 4.aseprite',

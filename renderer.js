@@ -121,6 +121,12 @@ class Entity {
 		);
 	}
 
+	getComponents(name) {
+		return this.components.filter(
+			component => component.constructor.name === name
+		);
+	}
+
 	destroy() {
 		this.components.forEach(component => component.onDestroy());
 		const index = entities.findIndex(entity => entity === this);
@@ -502,7 +508,10 @@ class SlimeControllerComponent extends Component {
 	onInit() {
 		super.onInit();
 		this.animatedSprite = this.entity.getComponent('AnimatedSpriteComponent');
-		this.biteAttack = this.entity.getComponent('AttackComponent');
+		const attacks = this.entity.getComponents('AttackComponent');
+		this.biteAttack = attacks.find(
+			attackComponent => attackComponent.attackName === 'ATTACK_BITE'
+		);
 	}
 
 	afterInit() {
@@ -562,7 +571,7 @@ class SlimeControllerComponent extends Component {
 			.addComponent(new SlimeControllerComponent())
 			.addComponent(new AnimatedSpriteComponent('character:slime'))
 			.addComponent(
-				new AttackComponent('ATTACKING', 40, 1000, {
+				new AttackComponent('ATTACK_BITE', 40, 1000, {
 					x: 32,
 					y: 16,
 					width: 48,
