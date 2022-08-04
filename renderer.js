@@ -234,12 +234,12 @@ class SpriteComponent extends Component {
 }
 
 class SpriteAnimation {
-	constructor(name, animation) {
+	constructor(name, animation, options = {}) {
 		this.frames = animation.frames;
 		this.name = name;
 		this.loop = false;
-		this.frameNumber = 0;
-		this.timeSpent = 0;
+		this.frameNumber = options.frameNumber || 0;
+		this.timeSpent = options.timeSpent || 0;
 		this.speed = 1;
 		this.animationSpeed = 1;
 	}
@@ -278,7 +278,14 @@ class AnimatedSpriteComponent extends SpriteComponent {
 		this.asset = AnimatedAssets[assetName];
 		this.defaultAnimation = new SpriteAnimation(
 			'IDLE',
-			this.asset.animations['IDLE']
+			this.asset.animations['IDLE'],
+			{
+				frameNumber: MathExt.randomInt(
+					0,
+					this.asset.animations['IDLE'].frames.length
+				),
+				timeSpent: MathExt.randomInt(0, 100)
+			}
 		);
 		this.animations = Object.keys(this.asset.animations).map(
 			key => new SpriteAnimation(key, this.asset.animations[key])

@@ -162,5 +162,6 @@ contextBridge.exposeInMainWorld('EntityPrefab', {
 });
 
 contextBridge.exposeInMainWorld('MathExt', {
-	clamp: (num, min, max) => Math.min(Math.max(num, min), max)
+	clamp: (num, min, max) => Math.min(Math.max(num, min), max),
+	randomInt: (min, max) => Math.round(Math.random() * (max - min) + min)
 });
