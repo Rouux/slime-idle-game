@@ -1,4 +1,5 @@
 window.entities = [];
+window.classes = [];
 /** @type HTMLCanvasElement*/
 const canvas = document.getElementById('main-canvas');
 const context = canvas.getContext('2d');
@@ -133,6 +134,31 @@ class Entity {
 		entities.splice(index, 1);
 	}
 }
+
+// 'slime:static': {
+// 	transform: {
+// 		x: 256,
+// 		y: 64
+// 	},
+// 	components: [
+// 		{
+// 			name: 'AnimatedSpriteComponent',
+// 			args: ['character:slime']
+// 		},
+// 		{
+// 			name: 'HitboxComponent',
+// 			args: [undefined, { width: 64, height: 64 }]
+// 		},
+// 		{
+// 			name: 'HealthComponent',
+// 			args: [100]
+// 		},
+// 		{
+// 			name: 'FloatingHealthComponent',
+// 			args: [undefined]
+// 		}
+// 	]
+// }
 
 class Texture {
 	constructor(asset) {
@@ -555,7 +581,52 @@ class SlimeControllerComponent extends Component {
 	}
 }
 
-(function () {
+class EntityBuilder {
+	static spawnEntityPrefab(name, transform = { x: 0, y: 0 }) {
+		const entityPrefab = EntityPrefab[name];
+		if (!entityPrefab) throw Error(`Entity Prefab ${name} cannot be found !`);
+		const entity = new Entity(transform.x, transform.y);
+		const components = (entityPrefab.components || []).map(component =>
+			this.makeComponent(component)
+		);
+		components.forEach(component => entity.addComponent(component));
+		return entity;
+	}
+
+	static makeComponent(prefab) {
+		const args = (prefab.args || []).map(arg => this.computeArgument(arg));
+		return new classes[prefab.name](...args);
+	}
+
+	static computeArgument(argument) {
+		const clazz = argument._clazz;
+		if (!clazz) return argument;
+		const args = argument.args.map(arg => this.computeArgument(arg));
+		return new classes[clazz](...args);
+	}
+}
+
+(function initClasses() {
+	classes = {
+		Vector2,
+		Bounds,
+		Component,
+		Transform,
+		Entity,
+		Texture,
+		SpriteComponent,
+		SpriteAnimation,
+		AnimatedSpriteComponent,
+		HitboxComponent,
+		HurtBoxComponent,
+		HealthComponent,
+		FloatingHealthComponent,
+		AttackComponent,
+		SlimeControllerComponent
+	};
+})();
+
+(function game() {
 	const callComponentMethod = (name, ...args) => {
 		return entity =>
 			entity.components.forEach(component => component[name](...args));
@@ -583,13 +654,8 @@ class SlimeControllerComponent extends Component {
 			)
 			.addComponent(new HealthComponent(100));
 
-		new Entity(256, 64)
-			.addComponent(new AnimatedSpriteComponent('character:slime'))
-			.addComponent(
-				new HitboxComponent(new Vector2(0, 0), { width: 64, height: 64 })
-			)
-			.addComponent(new HealthComponent(100))
-			.addComponent(new FloatingHealthComponent(new Vector2(0, 0)));
+		EntityBuilder.spawnEntityPrefab('slime:static', { x: 324, y: 64 });
+		EntityBuilder.spawnEntityPrefab('slime:static', { x: 64, y: 64 });
 
 		entities.forEach(callComponentMethod('onInit'));
 		entities.forEach(callComponentMethod('afterInit'));

@@ -127,6 +127,40 @@ const AnimatedAssets = {
 
 contextBridge.exposeInMainWorld('AnimatedAssets', AnimatedAssets);
 
+contextBridge.exposeInMainWorld('EntityPrefab', {
+	'slime:static': {
+		components: [
+			{
+				name: 'AnimatedSpriteComponent',
+				args: ['character:slime']
+			},
+			{
+				name: 'HitboxComponent',
+				args: [
+					{
+						_clazz: 'Vector2',
+						args: [0, 0]
+					},
+					{ width: 64, height: 64 }
+				]
+			},
+			{
+				name: 'HealthComponent',
+				args: [100]
+			},
+			{
+				name: 'FloatingHealthComponent',
+				args: [
+					{
+						_clazz: 'Vector2',
+						args: [0, 0]
+					}
+				]
+			}
+		]
+	}
+});
+
 contextBridge.exposeInMainWorld('MathExt', {
 	clamp: (num, min, max) => Math.min(Math.max(num, min), max)
 });
