@@ -153,7 +153,7 @@ contextBridge.exposeInMainWorld('EntityPrefab', {
 				args: [
 					{
 						_clazz: 'Vector2',
-						args: [0, 0]
+						args: [0, 64]
 					}
 				]
 			}

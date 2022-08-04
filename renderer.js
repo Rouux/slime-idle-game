@@ -430,6 +430,12 @@ class HealthComponent extends Component {
 }
 
 class FloatingHealthComponent extends Component {
+	constructor(position, width = 64, height = 12) {
+		super(position);
+		this.width = width;
+		this.height = height;
+	}
+
 	onInit() {
 		super.onInit();
 		this.healthComponent = this.entity.getComponent('HealthComponent');
@@ -442,21 +448,21 @@ class FloatingHealthComponent extends Component {
 		context.lineWidth = 1;
 		context.rect(
 			this.position.x,
-			canvas.height - 12 - this.position.y - 64,
-			64,
-			12
+			canvas.height - this.height - this.position.y,
+			this.width,
+			this.height
 		);
 		context.closePath();
 		context.stroke();
 
 		context.beginPath();
 		context.fillStyle = 'red';
-		const width = 64 * this.healthComponent.percentage;
+		const width = this.width * this.healthComponent.percentage;
 		context.rect(
 			this.position.x,
-			canvas.height - 12 - this.position.y - 64,
+			canvas.height - this.height - this.position.y,
 			width,
-			12
+			this.height
 		);
 		context.closePath();
 		context.fill();
