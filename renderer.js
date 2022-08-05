@@ -282,7 +282,7 @@ class AnimatedSpriteComponent extends SpriteComponent {
 			{
 				frameNumber: MathExt.randomInt(
 					0,
-					this.asset.animations['IDLE'].frames.length
+					this.asset.animations['IDLE'].frames.length - 1
 				),
 				timeSpent: MathExt.randomInt(0, 100)
 			}
