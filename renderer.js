@@ -62,6 +62,27 @@ class Component {
 	constructor(position) {
 		this.transform = new Transform(position);
 		this._hasInit = false;
+		this._entity = undefined;
+		if (!Component._entities[this.constructor.name]) {
+			Component._entities[this.constructor.name] = [];
+		}
+	}
+
+	static get entities() {
+		return Component._entities[this.prototype.constructor.name];
+	}
+
+	get entities() {
+		return Component._entities[this.constructor.name];
+	}
+
+	set entity(entity) {
+		Component._entities[this.constructor.name].push(entity);
+		this._entity = entity;
+	}
+
+	get entity() {
+		return this._entity;
 	}
 
 	get position() {
@@ -80,8 +101,14 @@ class Component {
 	beforeDraw(_context, _delta) {}
 	onDraw(_context, _delta) {}
 	afterDraw(_context, _delta) {}
-	onDestroy() {}
+	onDestroy() {
+		const ownerIndex = this.entities.findIndex(
+			entity => entity === this.entity
+		);
+		this.entities.splice(ownerIndex, 1);
+	}
 }
+Component._entities = [];
 
 class Transform {
 	constructor(position = Vector2.ZERO) {
@@ -134,31 +161,6 @@ class Entity {
 		entities.splice(index, 1);
 	}
 }
-
-// 'slime:static': {
-// 	transform: {
-// 		x: 256,
-// 		y: 64
-// 	},
-// 	components: [
-// 		{
-// 			name: 'AnimatedSpriteComponent',
-// 			args: ['character:slime']
-// 		},
-// 		{
-// 			name: 'HitboxComponent',
-// 			args: [undefined, { width: 64, height: 64 }]
-// 		},
-// 		{
-// 			name: 'HealthComponent',
-// 			args: [100]
-// 		},
-// 		{
-// 			name: 'FloatingHealthComponent',
-// 			args: [undefined]
-// 		}
-// 	]
-// }
 
 class Texture {
 	constructor(asset) {
@@ -582,14 +584,12 @@ class SlimeControllerComponent extends Component {
 	findTarget() {
 		let leftestEnemy = undefined;
 		let minPositionX = Number.MAX_VALUE;
-		entities
-			.filter(entity => entity.getComponent('EnemyControllerComponent'))
-			.forEach(entity => {
-				if (entity.position.x < minPositionX) {
-					minPositionX = entity.position.x;
-					leftestEnemy = entity;
-				}
-			});
+		EnemyControllerComponent.entities.forEach(entity => {
+			if (entity.position.x < minPositionX) {
+				minPositionX = entity.position.x;
+				leftestEnemy = entity;
+			}
+		});
 		return leftestEnemy;
 	}
 
@@ -614,8 +614,7 @@ class SlimeControllerComponent extends Component {
 	canFindTarget() {
 		return (
 			this.biteAttack.isAnimationOver() &&
-			entities.filter(entity => entity.getComponent('EnemyControllerComponent'))
-				.length
+			EnemyControllerComponent.entities?.length > 0
 		);
 	}
 }
