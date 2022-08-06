@@ -145,6 +145,10 @@ contextBridge.exposeInMainWorld('EntityPrefab', {
 				]
 			},
 			{
+				name: 'EnemyControllerComponent',
+				args: []
+			},
+			{
 				name: 'HealthComponent',
 				args: [100]
 			},

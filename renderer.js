@@ -322,14 +322,18 @@ class AnimatedSpriteComponent extends SpriteComponent {
 		const newFrame = this.animation.progress(delta);
 		if (newFrame != this.frame) {
 			const endKey = this.keys
-				.filter(key => key.animation === this.animation.name)
-				.filter(key => key.time === 'end')
+				.filter(
+					({ animation, time }) =>
+						animation === this.animation.name && time === 'end'
+				)
 				.find(key => key.frame === currentFrameNumber)?.name;
 			if (endKey && this.watched[endKey]) this.watched[endKey]();
 
 			const startKey = this.keys
-				.filter(key => key.animation === this.animation.name)
-				.filter(key => key.time === 'start')
+				.filter(
+					({ animation, time }) =>
+						animation === this.animation.name && time === 'start'
+				)
 				.find(key => key.frame === this.animation.frameNumber)?.name;
 			if (startKey && this.watched[startKey]) this.watched[startKey]();
 		}
@@ -536,6 +540,8 @@ class AttackComponent extends Component {
 	}
 }
 
+class EnemyControllerComponent extends Component {}
+
 class SlimeControllerComponent extends Component {
 	constructor(speed = 100) {
 		super();
@@ -560,7 +566,7 @@ class SlimeControllerComponent extends Component {
 
 	update(time, delta) {
 		if (this.target) {
-			const reached = this.moveToTarget(delta);
+			const reached = this.moveTowardTarget(delta);
 			if (reached && this.biteAttack.canAttack()) {
 				this.target = undefined;
 				this.lastTargetReachedTime = time;
@@ -568,18 +574,34 @@ class SlimeControllerComponent extends Component {
 			}
 		} else if (this.canFindTarget(time)) {
 			this.animatedSprite.playAnimationLoop('WALKING');
-			this.target = new Vector2(
-				parseInt(Math.random() * (canvas.width - this.animatedSprite.width)),
-				this.entity.position.y
-			);
+			this.target = this.findTarget();
 		}
 		this.animatedSprite.animationSpeed = this.speed / 100.0;
 	}
 
-	moveToTarget(delta) {
-		const direction = this.target.sub(this.entity.position).normalize();
+	findTarget() {
+		let leftestEnemy = undefined;
+		let minPositionX = Number.MAX_VALUE;
+		entities
+			.filter(entity => entity.getComponent('EnemyControllerComponent'))
+			.forEach(entity => {
+				if (entity.position.x < minPositionX) {
+					minPositionX = entity.position.x;
+					leftestEnemy = entity;
+				}
+			});
+		return leftestEnemy;
+	}
+
+	moveTowardTarget(delta) {
+		const halfWidth = 32;
+		const targetPosition = new Vector2(
+			this.target.position.x - halfWidth,
+			this.entity.position.y
+		);
+		const direction = targetPosition.sub(this.entity.position).normalize();
 		const directionalDistance = delta * this.speed * direction.x;
-		const distanceToTarget = this.entity.position.distance(this.target);
+		const distanceToTarget = this.entity.position.distance(targetPosition);
 		this.entity.position.x += MathExt.clamp(
 			directionalDistance,
 			-distanceToTarget,
@@ -590,7 +612,11 @@ class SlimeControllerComponent extends Component {
 	}
 
 	canFindTarget() {
-		return this.biteAttack.isAnimationOver();
+		return (
+			this.biteAttack.isAnimationOver() &&
+			entities.filter(entity => entity.getComponent('EnemyControllerComponent'))
+				.length
+		);
 	}
 }
 
@@ -635,6 +661,7 @@ class EntityBuilder {
 		HealthComponent,
 		FloatingHealthComponent,
 		AttackComponent,
+		EnemyControllerComponent,
 		SlimeControllerComponent
 	};
 })();
@@ -651,7 +678,10 @@ class EntityBuilder {
 				new SpriteComponent('block:prototype_64')
 			);
 		}
-		new Entity(64, 64)
+		EntityBuilder.spawnEntityPrefab('slime:static', { x: 324, y: 64 });
+		EntityBuilder.spawnEntityPrefab('slime:static', { x: 396, y: 64 });
+
+		new Entity(0, 64)
 			.addComponent(new SlimeControllerComponent())
 			.addComponent(new AnimatedSpriteComponent('character:slime'))
 			.addComponent(
@@ -666,9 +696,6 @@ class EntityBuilder {
 				new HitboxComponent(new Vector2(0, 0), { width: 64, height: 64 })
 			)
 			.addComponent(new HealthComponent(100));
-
-		EntityBuilder.spawnEntityPrefab('slime:static', { x: 324, y: 64 });
-		EntityBuilder.spawnEntityPrefab('slime:static', { x: 64, y: 64 });
 
 		entities.forEach(callComponentMethod('onInit'));
 		entities.forEach(callComponentMethod('afterInit'));
