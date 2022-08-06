@@ -542,37 +542,30 @@ class AttackComponent extends Component {
 	}
 }
 
-class EnemyControllerComponent extends Component {}
-
-class SlimeControllerComponent extends Component {
-	constructor(speed = 100) {
+class CharacterController extends Component {
+	constructor(speed) {
 		super();
 		this.speed = speed;
 		this.target = undefined;
-		this.lastTargetReachedTime = 0;
+		this.xOffset = 0;
 	}
+
+	onTargetReached() {}
+	canFindTarget() {}
+	findTarget() {}
 
 	onInit() {
 		super.onInit();
 		this.animatedSprite = this.entity.getComponent('AnimatedSpriteComponent');
-		const attacks = this.entity.getComponents('AttackComponent');
-		this.biteAttack = attacks.find(
-			attackComponent => attackComponent.attackName === 'ATTACK_BITE'
-		);
-	}
-
-	afterInit() {
-		this.biteAttack.startHurtOn('startBite');
-		this.biteAttack.endHurtOn('endBite');
 	}
 
 	update(time, delta) {
+		super.update(delta);
 		if (this.target) {
 			const reached = this.moveTowardTarget(delta);
-			if (reached && this.biteAttack.canAttack()) {
+			if (reached) {
 				this.target = undefined;
-				this.lastTargetReachedTime = time;
-				this.biteAttack.attack();
+				this.onTargetReached();
 			}
 		} else if (this.canFindTarget(time)) {
 			this.animatedSprite.playAnimationLoop('WALKING');
@@ -581,22 +574,9 @@ class SlimeControllerComponent extends Component {
 		this.animatedSprite.animationSpeed = this.speed / 100.0;
 	}
 
-	findTarget() {
-		let leftestEnemy = undefined;
-		let minPositionX = Number.MAX_VALUE;
-		EnemyControllerComponent.entities.forEach(entity => {
-			if (entity.position.x < minPositionX) {
-				minPositionX = entity.position.x;
-				leftestEnemy = entity;
-			}
-		});
-		return leftestEnemy;
-	}
-
 	moveTowardTarget(delta) {
-		const halfWidth = 32;
 		const targetPosition = new Vector2(
-			this.target.position.x - halfWidth,
+			this.target.position.x + this.xOffset,
 			this.entity.position.y
 		);
 		const direction = targetPosition.sub(this.entity.position).normalize();
@@ -609,6 +589,62 @@ class SlimeControllerComponent extends Component {
 		);
 
 		return Math.abs(directionalDistance) >= Math.abs(distanceToTarget);
+	}
+}
+
+class EnemyControllerComponent extends CharacterController {
+	constructor(speed = 100) {
+		super(speed);
+		this.xOffset = 32;
+	}
+
+	onTargetReached() {
+		// @todo : do something
+		console.log('Well, now do something');
+	}
+
+	canFindTarget() {
+		return SlimeControllerComponent.entities?.length > 0;
+	}
+
+	findTarget() {
+		return SlimeControllerComponent.entities?.[0];
+	}
+}
+
+class SlimeControllerComponent extends CharacterController {
+	constructor(speed = 100) {
+		super(speed);
+		this.xOffset = -32;
+	}
+
+	onInit() {
+		super.onInit();
+		const attacks = this.entity.getComponents('AttackComponent');
+		this.biteAttack = attacks.find(
+			attackComponent => attackComponent.attackName === 'ATTACK_BITE'
+		);
+	}
+
+	afterInit() {
+		this.biteAttack.startHurtOn('startBite');
+		this.biteAttack.endHurtOn('endBite');
+	}
+
+	onTargetReached() {
+		this.biteAttack.attack();
+	}
+
+	findTarget() {
+		let leftestEnemy = undefined;
+		let minPositionX = Number.MAX_VALUE;
+		EnemyControllerComponent.entities.forEach(entity => {
+			if (entity.position.x < minPositionX) {
+				minPositionX = entity.position.x;
+				leftestEnemy = entity;
+			}
+		});
+		return leftestEnemy;
 	}
 
 	canFindTarget() {
@@ -678,13 +714,14 @@ class EntityBuilder {
 			);
 		}
 		EntityBuilder.spawnEntityPrefab('slime:static', { x: 324, y: 64 });
-		EntityBuilder.spawnEntityPrefab('slime:static', { x: 396, y: 64 });
+		EntityBuilder.spawnEntityPrefab('slime:static', { x: 522, y: 64 });
+		EntityBuilder.spawnEntityPrefab('slime:static', { x: 892, y: 64 });
 
 		new Entity(0, 64)
-			.addComponent(new SlimeControllerComponent())
+			.addComponent(new SlimeControllerComponent(80))
 			.addComponent(new AnimatedSpriteComponent('character:slime'))
 			.addComponent(
-				new AttackComponent('ATTACK_BITE', 40, 1000, {
+				new AttackComponent('ATTACK_BITE', 30, 1000, {
 					x: 32,
 					y: 16,
 					width: 48,
